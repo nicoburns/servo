@@ -311,7 +311,35 @@ impl FlexContainer {
                 let free_space = cross_size - content_cross_size;
                 let layout_is_flex_reversed = flex_context.flex_wrap_reverse;
 
-                cross_start_position_cursor = match flex_context.align_content {
+                // Implement fallback alignment. Fallback occurs in two cases:
+                let resolved_content_alignment: AlignContent = {
+                    // If free space is negative the "safe" alignment variants all fallback to Start alignment
+                    if free_space <= Length::zero() {
+                        // TODO: make this conditional on "safe" alignment being enabled once parsing of safe/unsafe
+                        // keywords is implemented in stylo.
+                        match flex_context.align_content {
+                            AlignContent::SpaceBetween => AlignContent::Start,
+                            AlignContent::SpaceAround => AlignContent::Start,
+                            AlignContent::SpaceEvenly => AlignContent::Start,
+                            _ => flex_context.align_content,
+                        }
+                    }
+                    // Else if free space is positive and there is only 1 or 0 lines then the space-* modes fallback to
+                    // a mode that makes sense with a single line.
+                    else if line_count <= 1 {
+                        match flex_context.align_content {
+                            AlignContent::SpaceBetween => AlignContent::FlexStart,
+                            AlignContent::SpaceAround => AlignContent::Center,
+                            AlignContent::SpaceEvenly => AlignContent::Center,
+                            _ => flex_context.align_content,
+                        }
+                    } else {
+                        flex_context.align_content
+                    }
+                };
+
+                // Implement "unsafe" alignment. "safe" alignment is handled by the fallback process above.
+                cross_start_position_cursor = match resolved_content_alignment {
                     AlignContent::Start => Length::zero(),
                     AlignContent::FlexStart => {
                         if layout_is_flex_reversed {
@@ -331,45 +359,24 @@ impl FlexContainer {
                     AlignContent::Center => free_space / 2.0,
                     AlignContent::Stretch => Length::zero(),
                     AlignContent::SpaceBetween => Length::zero(),
-                    AlignContent::SpaceAround => {
-                        if free_space >= Length::zero() {
-                            (free_space / line_count as CSSFloat) / 2.0
-                        } else {
-                            Length::zero()
-                            // TODO: implement unsafe fallback: (free_space / 2.0)
-                        }
-                    },
-                    AlignContent::SpaceEvenly => {
-                        if free_space >= Length::zero() {
-                            free_space / (line_count + 1) as CSSFloat
-                        } else {
-                            Length::zero()
-                            // TODO: implement unsafe fallback: (free_space / 2.0)
-                        }
-                    },
+                    AlignContent::SpaceAround => (free_space / line_count as CSSFloat) / 2.0,
+                    AlignContent::SpaceEvenly => free_space / (line_count + 1) as CSSFloat,
                 };
 
-                // Note: free_space may be negative in which case we wish the gaps between items to be zero
-                // (although this will change once gap is implemented)
                 // TODO: Implement gap property
-                let item_main_interval = if free_space <= Length::zero() || line_count <= 1 {
-                    Length::zero() /* gap */
-                } else {
-                    /*gap + */
-                    match flex_context.align_content {
-                        AlignContent::Start => Length::zero(),
-                        AlignContent::FlexStart => Length::zero(),
-                        AlignContent::End => Length::zero(),
-                        AlignContent::FlexEnd => Length::zero(),
-                        AlignContent::Center => Length::zero(),
-                        AlignContent::Stretch => Length::zero(),
-                        AlignContent::SpaceBetween => free_space / (line_count - 1) as CSSFloat,
-                        AlignContent::SpaceAround => free_space / line_count as CSSFloat,
-                        AlignContent::SpaceEvenly => free_space / (line_count + 1) as CSSFloat,
-                    }
+                let line_interval = /*gap + */ match resolved_content_alignment {
+                    AlignContent::Start => Length::zero(),
+                    AlignContent::FlexStart => Length::zero(),
+                    AlignContent::End => Length::zero(),
+                    AlignContent::FlexEnd => Length::zero(),
+                    AlignContent::Center => Length::zero(),
+                    AlignContent::Stretch => Length::zero(),
+                    AlignContent::SpaceBetween => free_space / (line_count - 1) as CSSFloat,
+                    AlignContent::SpaceAround => free_space / line_count as CSSFloat,
+                    AlignContent::SpaceEvenly => free_space / (line_count + 1) as CSSFloat,
                 };
 
-                item_main_interval
+                line_interval
             },
             _ => Length::zero(),
         };
@@ -754,7 +761,7 @@ impl FlexLine<'_> {
         flex_context: &mut FlexContext,
         container_main_size: Length,
     ) -> FlexLineLayoutResult {
-        let (item_used_main_sizes, remaining_free_space) =
+        let (item_used_main_sizes, mut free_space) =
             self.resolve_flexible_lengths(container_main_size);
 
         // https://drafts.csswg.org/css-flexbox/#algo-cross-item
@@ -813,75 +820,78 @@ impl FlexLine<'_> {
         // Distribute any remaining free space
         // https://drafts.csswg.org/css-flexbox/#algo-main-align
         let (item_main_margins, free_space_distributed) =
-            self.resolve_auto_main_margins(remaining_free_space);
+            self.resolve_auto_main_margins(free_space);
+        if free_space_distributed {
+            free_space = Length::zero();
+        }
 
         // Align the items along the main-axis per justify-content.
         let item_count = self.items.len();
         let layout_is_flex_reversed = flex_context.flex_direction_is_reversed;
 
-        let main_start_position = if free_space_distributed {
-            Length::zero()
-        } else {
-            match flex_context.justify_content {
-                JustifyContent::Start => Length::zero(),
-                JustifyContent::FlexStart => {
-                    if layout_is_flex_reversed {
-                        remaining_free_space
-                    } else {
-                        Length::zero()
-                    }
-                },
-                JustifyContent::End => remaining_free_space,
-                JustifyContent::FlexEnd => {
-                    if layout_is_flex_reversed {
-                        Length::zero()
-                    } else {
-                        remaining_free_space
-                    }
-                },
-                JustifyContent::Center => remaining_free_space / 2.0,
-                JustifyContent::Stretch => Length::zero(),
-                JustifyContent::SpaceBetween => Length::zero(),
-                JustifyContent::SpaceAround => {
-                    if remaining_free_space >= Length::zero() {
-                        (remaining_free_space / item_count as CSSFloat) / 2.0
-                    } else {
-                        Length::zero()
-                        // TODO: implement unsafe fallback: (remaining_free_space / 2.0)
-                    }
-                },
-                JustifyContent::SpaceEvenly => {
-                    if remaining_free_space >= Length::zero() {
-                        remaining_free_space / (item_count + 1) as CSSFloat
-                    } else {
-                        Length::zero()
-                        // TODO: implement unsafe fallback: (remaining_free_space / 2.0)
-                    }
-                },
+        // Implement fallback alignment. Fallback occurs in two cases:
+        let resolved_justify_content: JustifyContent = {
+            // If free space is negative the "safe" alignment variants all fallback to Start alignment
+            if free_space <= Length::zero() {
+                // TODO: make this conditional on "safe" alignment being enabled once parsing of safe/unsafe
+                // keywords is implemented in stylo.
+                match flex_context.justify_content {
+                    JustifyContent::SpaceBetween => JustifyContent::Start,
+                    JustifyContent::SpaceAround => JustifyContent::Start,
+                    JustifyContent::SpaceEvenly => JustifyContent::Start,
+                    _ => flex_context.justify_content,
+                }
+            }
+            // Else if free space is positive and there is only 1 or 0 lines then the space-* modes fallback to
+            // a mode that makes sense with a single line.
+            else if item_count <= 1 {
+                match flex_context.justify_content {
+                    JustifyContent::SpaceBetween => JustifyContent::FlexStart,
+                    JustifyContent::SpaceAround => JustifyContent::Center,
+                    JustifyContent::SpaceEvenly => JustifyContent::Center,
+                    _ => flex_context.justify_content,
+                }
+            } else {
+                flex_context.justify_content
             }
         };
 
-        // Note: remaining_free_space may be negative in which case we wish the gaps between items to be zero
-        // (although this will change once gap is implemented)
+        // Implement "unsafe" alignment. "safe" alignment is handled by the fallback process above.
+        let main_start_position = match resolved_justify_content {
+            JustifyContent::Start => Length::zero(),
+            JustifyContent::FlexStart => {
+                if layout_is_flex_reversed {
+                    free_space
+                } else {
+                    Length::zero()
+                }
+            },
+            JustifyContent::End => free_space,
+            JustifyContent::FlexEnd => {
+                if layout_is_flex_reversed {
+                    Length::zero()
+                } else {
+                    free_space
+                }
+            },
+            JustifyContent::Center => free_space / 2.0,
+            JustifyContent::Stretch => Length::zero(),
+            JustifyContent::SpaceBetween => Length::zero(),
+            JustifyContent::SpaceAround => (free_space / item_count as CSSFloat) / 2.0,
+            JustifyContent::SpaceEvenly => free_space / (item_count + 1) as CSSFloat,
+        };
+
         // TODO: Implement gap property
-        let item_main_interval = if free_space_distributed ||
-            item_count == 0 ||
-            remaining_free_space <= Length::zero()
-        {
-            Length::zero() /* gap */
-        } else {
-            /*gap + */
-            match flex_context.justify_content {
-                JustifyContent::Start => Length::zero(),
-                JustifyContent::FlexStart => Length::zero(),
-                JustifyContent::End => Length::zero(),
-                JustifyContent::FlexEnd => Length::zero(),
-                JustifyContent::Center => Length::zero(),
-                JustifyContent::Stretch => Length::zero(),
-                JustifyContent::SpaceBetween => remaining_free_space / (item_count - 1) as CSSFloat,
-                JustifyContent::SpaceAround => remaining_free_space / item_count as CSSFloat,
-                JustifyContent::SpaceEvenly => remaining_free_space / (item_count + 1) as CSSFloat,
-            }
+        let item_main_interval = /*gap + */ match resolved_justify_content {
+            JustifyContent::Start => Length::zero(),
+            JustifyContent::FlexStart => Length::zero(),
+            JustifyContent::End => Length::zero(),
+            JustifyContent::FlexEnd => Length::zero(),
+            JustifyContent::Center => Length::zero(),
+            JustifyContent::Stretch => Length::zero(),
+            JustifyContent::SpaceBetween => free_space / (item_count - 1) as CSSFloat,
+            JustifyContent::SpaceAround => free_space / item_count as CSSFloat,
+            JustifyContent::SpaceEvenly => free_space / (item_count + 1) as CSSFloat,
         };
 
         // https://drafts.csswg.org/css-flexbox/#algo-cross-margins
