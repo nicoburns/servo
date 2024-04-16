@@ -207,14 +207,6 @@ impl FlexContainer {
         let flex_wrap = flex_container_position_style.flex_wrap;
         let flex_direction = flex_container_position_style.flex_direction;
 
-        // Column flex containers are not fully implemented yet,
-        // so give a different layout instead of panicking.
-        // FIXME: implement `todo!`s for FlexAxis::Column below, and remove this
-        let flex_direction = match flex_direction {
-            FlexDirection::Row | FlexDirection::Column => FlexDirection::Row,
-            FlexDirection::RowReverse | FlexDirection::ColumnReverse => FlexDirection::RowReverse,
-        };
-
         let container_is_single_line = match containing_block.style.get_position().flex_wrap {
             FlexWrap::Nowrap => true,
             FlexWrap::Wrap | FlexWrap::WrapReverse => false,
@@ -265,15 +257,7 @@ impl FlexContainer {
         let container_main_size = match flex_axis {
             FlexAxis::Row => containing_block.inline_size,
             FlexAxis::Column => {
-                // FIXME “using the rules of the formatting context in which it participates”
-                // but if block-level with `block-size: max-auto` that requires
-                // layout of the content to be fully done:
-                // https://github.com/w3c/csswg-drafts/issues/4905
-                // Gecko reportedly uses `block-size: fit-content` in this case
-                // (which requires running another pass of the "full" layout algorithm)
-                todo!()
-                // Note: this panic shouldn’t happen since the start of `FlexContainer::layout`
-                // forces `FlexAxis::Row`.
+                containing_block.block_size.non_auto().unwrap_or(Length::zero().into())
             },
         };
 
