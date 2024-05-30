@@ -184,7 +184,7 @@ impl IndependentFormattingContext {
         match self {
             Self::NonReplaced(inner) => inner
                 .contents
-                .inline_content_sizes(layout_context, inner.style.writing_mode),
+                .inline_content_sizes(layout_context, &inner.style),
             Self::Replaced(inner) => inner.contents.inline_content_sizes(&inner.style),
         }
     }
@@ -200,9 +200,8 @@ impl IndependentFormattingContext {
                 let content_sizes = &mut non_replaced.content_sizes;
                 let contents = &mut non_replaced.contents;
                 sizing::outer_inline(style, containing_block_writing_mode, || {
-                    *content_sizes.get_or_insert_with(|| {
-                        contents.inline_content_sizes(layout_context, style.writing_mode)
-                    })
+                    *content_sizes
+                        .get_or_insert_with(|| contents.inline_content_sizes(layout_context, style))
                 })
             },
             Self::Replaced(replaced) => {
@@ -232,6 +231,7 @@ impl NonReplacedFormattingContext {
                 layout_context,
                 positioning_context,
                 containing_block_for_children,
+                containing_block,
             ),
             NonReplacedFormattingContextContents::Table(table) => table.layout(
                 layout_context,
@@ -243,11 +243,11 @@ impl NonReplacedFormattingContext {
     }
 
     pub fn inline_content_sizes(&mut self, layout_context: &LayoutContext) -> ContentSizes {
-        let writing_mode = self.style.writing_mode;
+        let style = &self.style;
         let contents = &mut self.contents;
         *self
             .content_sizes
-            .get_or_insert_with(|| contents.inline_content_sizes(layout_context, writing_mode))
+            .get_or_insert_with(|| contents.inline_content_sizes(layout_context, style))
     }
 }
 
@@ -255,14 +255,14 @@ impl NonReplacedFormattingContextContents {
     pub fn inline_content_sizes(
         &mut self,
         layout_context: &LayoutContext,
-        writing_mode: WritingMode,
+        style: &ComputedValues,
     ) -> ContentSizes {
         match self {
             Self::Flow(inner) => inner
                 .contents
-                .inline_content_sizes(layout_context, writing_mode),
-            Self::Flex(inner) => inner.inline_content_sizes(),
-            Self::Table(table) => table.inline_content_sizes(layout_context, writing_mode),
+                .inline_content_sizes(layout_context, style.writing_mode),
+            Self::Flex(inner) => inner.inline_content_sizes(layout_context, style),
+            Self::Table(table) => table.inline_content_sizes(layout_context, style.writing_mode),
         }
     }
 }
