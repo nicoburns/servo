@@ -6,6 +6,7 @@ use app_units::Au;
 use rayon::iter::IntoParallelRefMutIterator;
 use rayon::prelude::{IndexedParallelIterator, ParallelIterator};
 use serde::Serialize;
+use servo_config::pref;
 use style::computed_values::position::T as Position;
 use style::properties::ComputedValues;
 use style::values::computed::Length;
@@ -435,7 +436,10 @@ impl HoistedAbsolutelyPositionedBox {
         for_nearest_containing_block_for_all_descendants: &mut Vec<HoistedAbsolutelyPositionedBox>,
         containing_block: &DefiniteContainingBlock,
     ) {
-        if layout_context.use_rayon {
+        if layout_context.use_rayon &&
+            !pref!(layout.flexbox.use_taffy) &&
+            !pref!(layout.grid.enabled)
+        {
             let mut new_fragments = Vec::new();
             let mut new_hoisted_boxes = Vec::new();
 
