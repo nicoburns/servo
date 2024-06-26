@@ -18,6 +18,7 @@ atomic_refcell = { workspace = true }
 base = { workspace = true }
 canvas_traits = { workspace = true }
 bitflags = { workspace = true }
+cssparser = { workspace = true }
 embedder_traits = { workspace = true }
 euclid = { workspace = true }
 fnv = { workspace = true }
@@ -50,8 +51,8 @@ data-url = { workspace = true }
 webrender_api = { workspace = true }
 webrender_traits = { workspace = true }
 xi-unicode = { workspace = true }
-taffy = { git = "https://github.com/DioxusLabs/taffy", branch = "traitify-style", features = ["serde"] }
-taffy_stylo = { git = "https://github.com/DioxusLabs/taffy", branch = "traitify-style" }
+taffy = { git = "https://github.com/nicoburns/taffy", rev = "55a0d45c4a755fc9770b9dd18e6ab40f6f92c201", features = ["serde"] }
+taffy_stylo = { git = "https://github.com/nicoburns/taffy", rev = "55a0d45c4a755fc9770b9dd18e6ab40f6f92c201" }
 
 [dev-dependencies]
 lazy_static = { workspace = true }
