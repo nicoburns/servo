@@ -205,8 +205,8 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
                         let block_size = layout.content_block_size.to_f32_px();
 
                         LogicalVec2 {
-                            inline: Au::from_f32_px(inline_size),
-                            block: Au::from_f32_px(block_size),
+                            inline: Au::from_f32_px(inline_size) + pbm.padding_border_sums.inline,
+                            block: Au::from_f32_px(block_size) + pbm.padding_border_sums.block,
                         }
                     },
                 };
@@ -399,10 +399,34 @@ impl FlexContainer {
                 let padding = rect_to_logical_sides(layout.padding.map(Au::from_f32_px));
                 let border = rect_to_logical_sides(layout.border.map(Au::from_f32_px));
 
-                // Compute content box size and position
+                // Compute content box size and position.
+                //
+                // For the x/y position we have to correct for the difference between the
+                // content box and the border box for both the parent and the child.
                 let content_size = size_and_pos_to_logical_rect(
-                    layout.location.map(Au::from_f32_px),
-                    layout.size.map(Au::from_f32_px),
+                    taffy::Point {
+                        x: Au::from_f32_px(
+                            layout.location.x + layout.padding.left + layout.border.left,
+                        ) - pbm.padding.inline_start -
+                            pbm.border.inline_start,
+                        y: Au::from_f32_px(
+                            layout.location.y + layout.padding.top + layout.border.top,
+                        ) - pbm.padding.block_start -
+                            pbm.border.block_start,
+                    },
+                    taffy::Size {
+                        width: layout.size.width -
+                            layout.padding.left -
+                            layout.padding.right -
+                            layout.border.left -
+                            layout.border.right,
+                        height: layout.size.height -
+                            layout.padding.top -
+                            layout.padding.bottom -
+                            layout.border.top -
+                            layout.border.bottom,
+                    }
+                    .map(Au::from_f32_px),
                 );
 
                 // TODO: propagate margin
@@ -447,8 +471,10 @@ impl FlexContainer {
 
         IndependentLayout {
             fragments,
-            content_block_size: Au::from_f32_px(output.size.height),
-            content_inline_size_for_table: Some(Au::from_f32_px(output.size.width)),
+            content_block_size: Au::from_f32_px(output.size.height) - pbm.padding_border_sums.block,
+            content_inline_size_for_table: Some(
+                Au::from_f32_px(output.size.width) - pbm.padding_border_sums.inline,
+            ),
             baselines: Baselines::default(),
         }
     }
