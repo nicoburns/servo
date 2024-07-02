@@ -405,9 +405,8 @@ impl FlexContainer {
                     layout.size.map(Au::from_f32_px),
                 );
 
-                // TODO: Use computed box size for margin. Resolve auto margins.
-                let pbm = (*child.style).padding_border_margin(content_box_size_override);
-                let margin = pbm.margin.map(|m| m.auto_is(|| Au::zero()));
+                // TODO: propagate margin
+                let margin = rect_to_logical_sides(taffy::Rect::ZERO.map(Au::from_f32_px));
                 let collapsed_margin = CollapsedBlockMargins::from_margin(&margin);
 
                 match &child.flex_level_box {
@@ -448,8 +447,8 @@ impl FlexContainer {
 
         IndependentLayout {
             fragments,
-            content_block_size: Au::from_f32_px(output.size.height) - pbm.padding_border_sums.block,
-            content_inline_size_for_table: Some(Au::from_f32_px(output.size.width)  - pbm.padding_border_sums.inline),
+            content_block_size: Au::from_f32_px(output.size.height),
+            content_inline_size_for_table: Some(Au::from_f32_px(output.size.width)),
             baselines: Baselines::default(),
         }
     }
