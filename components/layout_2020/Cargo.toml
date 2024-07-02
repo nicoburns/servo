@@ -51,8 +51,8 @@ data-url = { workspace = true }
 webrender_api = { workspace = true }
 webrender_traits = { workspace = true }
 xi-unicode = { workspace = true }
-taffy = { git = "https://github.com/nicoburns/taffy", rev = "a0b6fecd0043adaef0d5ab02a9178f10c712080d", features = ["serde"] }
-taffy_stylo = { git = "https://github.com/nicoburns/taffy", rev = "a0b6fecd0043adaef0d5ab02a9178f10c712080d" }
+taffy = { git = "https://github.com/nicoburns/taffy", rev = "b05c2efa8004d8031262531876708bf4e4792d4a", features = ["serde"] }
+taffy_stylo = { git = "https://github.com/nicoburns/taffy", rev = "b05c2efa8004d8031262531876708bf4e4792d4a" }
 
 [dev-dependencies]
 lazy_static = { workspace = true }
