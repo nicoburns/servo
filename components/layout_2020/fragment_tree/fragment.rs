@@ -47,7 +47,7 @@ pub(crate) enum Fragment {
     IFrame(IFrameFragment),
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct CollapsedBlockMargins {
     pub collapsed_through: bool,
     pub start: CollapsedMargin,
@@ -60,7 +60,7 @@ pub(crate) struct CollapsedMargin {
     min_negative: Au,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct TextFragment {
     pub base: BaseFragment,
     #[serde(skip_serializing)]
@@ -78,7 +78,7 @@ pub(crate) struct TextFragment {
     pub justification_adjustment: Length,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct ImageFragment {
     pub base: BaseFragment,
     #[serde(skip_serializing)]
@@ -88,7 +88,7 @@ pub(crate) struct ImageFragment {
     pub image_key: ImageKey,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct IFrameFragment {
     pub base: BaseFragment,
     pub pipeline_id: PipelineId,
