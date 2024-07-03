@@ -398,6 +398,8 @@ impl FlexContainer {
 
                 let padding = rect_to_logical_sides(layout.padding.map(Au::from_f32_px));
                 let border = rect_to_logical_sides(layout.border.map(Au::from_f32_px));
+                let margin = rect_to_logical_sides(layout.margin.map(Au::from_f32_px));
+                let collapsed_margin = CollapsedBlockMargins::from_margin(&margin);
 
                 // Compute content box size and position.
                 //
@@ -428,11 +430,7 @@ impl FlexContainer {
                     }
                     .map(Au::from_f32_px),
                 );
-
-                // TODO: propagate margin
-                let margin = rect_to_logical_sides(taffy::Rect::ZERO.map(Au::from_f32_px));
-                let collapsed_margin = CollapsedBlockMargins::from_margin(&margin);
-
+                
                 match &child.flex_level_box {
                     FlexLevelBoxInner::FlexItem(independent_box) => {
                         // TODO: propagate absolute/fixed boxes from child positioning context
