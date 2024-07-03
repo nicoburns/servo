@@ -17,6 +17,7 @@ use servo_arc::Arc as ServoArc;
 use style::properties::ComputedValues;
 use style::servo::url::ComputedUrl;
 use style::values::computed::image::Image as ComputedImage;
+use style::values::generics::position::PreferredRatio;
 use style::values::CSSFloat;
 use style::Zero;
 use url::Url;
@@ -360,6 +361,16 @@ impl ReplacedContent {
         let intrinsic_size = self.flow_relative_intrinsic_size(style);
         let intrinsic_ratio = self.inline_size_over_block_size_intrinsic_ratio(style);
 
+        let aspect_ratio_style = style.get_position().aspect_ratio;
+        let aspect_ratio = if aspect_ratio_style.auto {
+            intrinsic_ratio
+        } else {
+            match aspect_ratio_style.ratio {
+                PreferredRatio::None => intrinsic_ratio,
+                PreferredRatio::Ratio(ratio) => Some(ratio.0.0 / ratio.1.0)
+            }
+        };
+
         let box_size = box_size.unwrap_or(
             style
                 .content_box_size(containing_block, pbm)
@@ -396,7 +407,7 @@ impl ReplacedContent {
                 clamp(inline, block)
             },
             (AuOrAuto::LengthPercentage(inline), AuOrAuto::Auto) => {
-                let block = if let Some(i_over_b) = intrinsic_ratio {
+                let block = if let Some(i_over_b) = aspect_ratio {
                     inline.scale_by(1.0 / i_over_b)
                 } else if let Some(block) = intrinsic_size.block {
                     block
@@ -406,7 +417,7 @@ impl ReplacedContent {
                 clamp(inline, block)
             },
             (AuOrAuto::Auto, AuOrAuto::LengthPercentage(block)) => {
-                let inline = if let Some(i_over_b) = intrinsic_ratio {
+                let inline = if let Some(i_over_b) = aspect_ratio {
                     block.scale_by(i_over_b)
                 } else if let Some(inline) = intrinsic_size.inline {
                     inline
@@ -417,7 +428,7 @@ impl ReplacedContent {
             },
             (AuOrAuto::Auto, AuOrAuto::Auto) => {
                 let inline_size =
-                    match (intrinsic_size.inline, intrinsic_size.block, intrinsic_ratio) {
+                    match (intrinsic_size.inline, intrinsic_size.block, aspect_ratio) {
                         (Some(inline), _, _) => inline,
                         (None, Some(block), Some(i_over_b)) => {
                             // “used height” in CSS 2 is always gonna be the intrinsic one,
@@ -445,14 +456,14 @@ impl ReplacedContent {
                     };
                 let block_size = if let Some(block) = intrinsic_size.block {
                     block
-                } else if let Some(i_over_b) = intrinsic_ratio {
+                } else if let Some(i_over_b) = aspect_ratio {
                     // “used width” in CSS 2 is what we just computed above
                     inline_size.scale_by(1.0 / i_over_b)
                 } else {
                     default_object_size().block
                 };
 
-                let i_over_b = if let Some(i_over_b) = intrinsic_ratio {
+                let i_over_b = if let Some(i_over_b) = aspect_ratio {
                     i_over_b
                 } else {
                     return clamp(inline_size, block_size);
