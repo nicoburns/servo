@@ -7,6 +7,7 @@ use atomic_refcell::{AtomicRefCell, AtomicRefMut};
 use style::properties::longhands::flex_direction::computed_value::T as FlexDirection;
 use style::properties::longhands::flex_wrap::computed_value::T as FlexWrap;
 use style::properties::ComputedValues;
+use style::values::computed::LengthPercentage;
 use style::values::generics::length::{GenericLengthPercentageOrAuto, LengthPercentageOrAuto};
 use style::Zero;
 use taffy::MaybeMath;
@@ -128,6 +129,15 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
         let mut child = (*self.source_child_nodes[usize::from(node_id)]).borrow_mut();
         let child = &mut *child;
 
+        fn option_f32_to_lpa(input: Option<f32>) -> LengthPercentageOrAuto<Au> {
+            match input {
+                None => LengthPercentageOrAuto::Auto,
+                Some(length) => {
+                    LengthPercentageOrAuto::LengthPercentage(Au::from_f32_px(length))
+                },
+            }
+        }
+
         with_independant_formatting_context(
             &mut child.flex_level_box,
             |independent_context| -> taffy::LayoutOutput {
@@ -136,11 +146,28 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
                         // The containing block of a flex item is the content box of the flex container
                         let containing_block = &self.content_box_size_override;
 
+                        // Adjust known_dimensions from border box to content box
+                        let pbm = replaced.style.padding_border_margin(&containing_block);
+                        let content_box_known_dimensions =
+                            taffy::Size {
+                                width: inputs.known_dimensions.width.map(|width| {
+                                    width - pbm.padding_border_sums.inline.to_f32_px()
+                                }),
+                                height: inputs.known_dimensions.height.map(|height| {
+                                    height - pbm.padding_border_sums.block.to_f32_px()
+                                }),
+                            };
+
+                        let content_box_size_override = LogicalVec2 {
+                            inline: option_f32_to_lpa(content_box_known_dimensions.width),
+                            block: option_f32_to_lpa(content_box_known_dimensions.height),
+                        };
+
                         replaced.contents.used_size_as_if_inline_element(
                             &containing_block,
                             &replaced.style,
-                            None, //box_size,
-                            &replaced.style.padding_border_margin(&containing_block),
+                            Some(content_box_size_override),
+                            &pbm,
                         )
                     },
 
@@ -168,13 +195,7 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
                             resolve_content_size(inputs.available_space.width, inline_sizes)
                         });
 
-                        let maybe_block_size = match content_box_known_dimensions.height {
-                            None => LengthPercentageOrAuto::Auto,
-                            Some(length) => {
-                                LengthPercentageOrAuto::LengthPercentage(Au::from_f32_px(length))
-                            },
-                        };
-
+                        let maybe_block_size = option_f32_to_lpa(content_box_known_dimensions.height);
                         let content_box_size_override = ContainingBlock {
                             inline_size: Au::from_f32_px(inline_size),
                             block_size: maybe_block_size,
