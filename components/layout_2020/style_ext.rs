@@ -606,6 +606,12 @@ impl From<stylo::Display> for Display {
             },
             stylo::DisplayInside::Flex => DisplayInside::Flex,
 
+            // FIXME: Actual CSS Grid support.
+            //
+            // Note that while this value is always unconditionally present in the stylo DisplayInside enum,
+            // it will only ever actually be parsed/instatiated if Servo's runtime CSS Grid flag is enabled.
+            stylo::DisplayInside::Grid => DisplayInside::Flex,
+
             // These should not be values of DisplayInside, but oh well
             stylo::DisplayInside::None => return Display::None,
             stylo::DisplayInside::Contents => return Display::Contents,
