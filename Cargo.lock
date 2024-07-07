@@ -6304,7 +6304,7 @@ dependencies = [
 [[package]]
 name = "taffy"
 version = "0.5.2"
-source = "git+https://github.com/nicoburns/taffy?rev=77235b8a81bf6320d968aa49f0c7de616f2dd09d#77235b8a81bf6320d968aa49f0c7de616f2dd09d"
+source = "git+https://github.com/nicoburns/taffy?rev=4adf12d13d50d25d0b5108bdfb0b92ecf24725e7#4adf12d13d50d25d0b5108bdfb0b92ecf24725e7"
 dependencies = [
  "arrayvec",
  "grid",
@@ -6316,7 +6316,7 @@ dependencies = [
 [[package]]
 name = "taffy_stylo"
 version = "0.0.1"
-source = "git+https://github.com/nicoburns/taffy?rev=77235b8a81bf6320d968aa49f0c7de616f2dd09d#77235b8a81bf6320d968aa49f0c7de616f2dd09d"
+source = "git+https://github.com/nicoburns/taffy?rev=4adf12d13d50d25d0b5108bdfb0b92ecf24725e7#4adf12d13d50d25d0b5108bdfb0b92ecf24725e7"
 dependencies = [
  "servo_arc",
  "style",
