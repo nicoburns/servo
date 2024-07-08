@@ -4,6 +4,7 @@
 
 use app_units::Au;
 use atomic_refcell::{AtomicRefCell, AtomicRefMut};
+use style::properties::longhands::aspect_ratio;
 use style::properties::longhands::flex_direction::computed_value::T as FlexDirection;
 use style::properties::longhands::flex_wrap::computed_value::T as FlexWrap;
 use style::properties::ComputedValues;
@@ -143,6 +144,10 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
                         // The containing block of a flex item is the content box of the flex container
                         let containing_block = &self.content_box_size_override;
 
+                        let intrinsic_aspect_ratio = replaced
+                            .contents
+                            .inline_size_over_block_size_intrinsic_ratio(&replaced.style);
+
                         // Adjust known_dimensions from border box to content box
                         let pbm = replaced.style.padding_border_margin(&containing_block);
                         let margin_sum = pbm.margin.auto_is(Au::zero).sum();
@@ -157,19 +162,37 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
                                 .known_dimensions
                                 .height
                                 .map(|height| height - content_box_inset.block),
-                        };
+                        }
+                        .maybe_apply_aspect_ratio(intrinsic_aspect_ratio);
 
                         let content_box_size_override = LogicalVec2 {
                             inline: option_f32_to_lpa(content_box_known_dimensions.width),
                             block: option_f32_to_lpa(content_box_known_dimensions.height),
                         };
 
-                        let content_box_size = replaced.contents.used_size_as_if_inline_element(
-                            &containing_block,
-                            &replaced.style,
-                            Some(content_box_size_override),
-                            &pbm,
-                        );
+                        let computed_content_box_size = match inputs.sizing_mode {
+                            taffy::SizingMode::InherentSize => {
+                                replaced.contents.used_size_as_if_inline_element(
+                                    &containing_block,
+                                    &replaced.style,
+                                    Some(content_box_size_override),
+                                    &pbm,
+                                )
+                            },
+                            taffy::SizingMode::ContentSize => replaced
+                                .contents
+                                .flow_relative_intrinsic_size(&replaced.style)
+                                .map(|v| v.unwrap_or(Au::zero())),
+                        };
+
+                        let content_box_size = LogicalVec2 {
+                            inline: content_box_size_override
+                                .inline
+                                .auto_is(|| computed_content_box_size.inline),
+                            block: content_box_size_override
+                                .block
+                                .auto_is(|| computed_content_box_size.block),
+                        };
 
                         child.child_fragments = replaced
                             .contents
