@@ -7,7 +7,6 @@ use atomic_refcell::{AtomicRefCell, AtomicRefMut};
 use style::properties::longhands::flex_direction::computed_value::T as FlexDirection;
 use style::properties::longhands::flex_wrap::computed_value::T as FlexWrap;
 use style::properties::ComputedValues;
-use style::values::computed::LengthPercentage;
 use style::values::generics::length::{GenericLengthPercentageOrAuto, LengthPercentageOrAuto};
 use style::Zero;
 use taffy::MaybeMath;
@@ -139,7 +138,7 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
         with_independant_formatting_context(
             &mut child.flex_level_box,
             |independent_context| -> taffy::LayoutOutput {
-                let logical_size = match independent_context {
+                let computed_size = match independent_context {
                     IndependentFormattingContext::Replaced(replaced) => {
                         // The containing block of a flex item is the content box of the flex container
                         let containing_block = &self.content_box_size_override;
@@ -172,9 +171,14 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
                             .contents
                             .make_fragments(&replaced.style, content_box_size);
 
-                        LogicalVec2 {
-                            inline: content_box_size.inline + pbm.padding_border_sums.inline,
-                            block: ontent_box_size.block + pbm.padding_border_sums.block,
+                        taffy::Size {
+                            width: inputs.known_dimensions.width.unwrap_or_else(|| {
+                                (content_box_size.inline + pbm.padding_border_sums.inline)
+                                    .to_f32_px()
+                            }),
+                            height: inputs.known_dimensions.height.unwrap_or_else(|| {
+                                (content_box_size.block + pbm.padding_border_sums.block).to_f32_px()
+                            }),
                         }
                     },
 
@@ -233,17 +237,14 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
 
                         let block_size = layout.content_block_size.to_f32_px();
 
-                        LogicalVec2 {
-                            inline: Au::from_f32_px(inline_size) + pbm.padding_border_sums.inline,
-                            block: Au::from_f32_px(block_size) + pbm.padding_border_sums.block,
+                        taffy::Size {
+                            width: inline_size + pbm.padding_border_sums.inline.to_f32_px(),
+                            height: block_size + pbm.padding_border_sums.block.to_f32_px(),
                         }
                     },
                 };
 
-                let size = inputs.known_dimensions.unwrap_or(taffy::Size {
-                    width: logical_size.inline.to_f32_px(),
-                    height: logical_size.block.to_f32_px(),
-                });
+                let size = inputs.known_dimensions.unwrap_or(computed_size);
 
                 taffy::LayoutOutput {
                     size,
