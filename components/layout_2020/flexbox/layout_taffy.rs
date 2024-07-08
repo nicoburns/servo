@@ -7,7 +7,10 @@ use atomic_refcell::{AtomicRefCell, AtomicRefMut};
 use style::properties::longhands::flex_direction::computed_value::T as FlexDirection;
 use style::properties::longhands::flex_wrap::computed_value::T as FlexWrap;
 use style::properties::ComputedValues;
-use style::values::generics::length::{GenericLengthPercentageOrAuto, LengthPercentageOrAuto};
+use style::values::computed::CSSPixelLength;
+use style::values::generics::length::{
+    GenericLengthPercentageOrAuto, GenericLengthPercentageOrNormal, LengthPercentageOrAuto,
+};
 use style::Zero;
 use taffy::MaybeMath;
 use taffy_stylo::{TaffyStyloStyle, TaffyStyloStyleRef};
@@ -294,11 +297,40 @@ impl FlexContainer {
     ) -> ContentSizes {
         let flex_direction = style.get_position().flex_direction;
         let flex_wrap = style.get_position().flex_wrap;
+        let column_gap = match style.clone_column_gap() {
+            GenericLengthPercentageOrNormal::Normal => 0.0,
+            GenericLengthPercentageOrNormal::LengthPercentage(lp) => {
+                lp.0.resolve(CSSPixelLength::new(0.0)).px()
+            },
+        };
+
+        // TODO: account for display:contents
+        let in_flow_child_count: usize = self
+            .children
+            .iter()
+            .filter(|child| {
+                let child = (**child).borrow();
+                match &child.flex_level_box {
+                    FlexLevelBoxInner::FlexItem(item) => !item.style().clone_display().is_none(),
+                    FlexLevelBoxInner::OutOfFlowAbsolutelyPositionedBox(_) => false,
+                }
+            })
+            .count();
+
+        let column_gap_contribution = if in_flow_child_count == 0 {
+            Au::zero()
+        } else {
+            Au::from_f32_px(column_gap * (in_flow_child_count - 1) as f32)
+        };
 
         let base = ContentSizes {
             min_content: Au::zero(),
             max_content: Au::zero(),
         };
+
+        if in_flow_child_count == 0 {
+            return base;
+        }
 
         let child_iter = self.children.iter().filter_map(|child| {
             let mut child = (**child).borrow_mut();
@@ -312,20 +344,32 @@ impl FlexContainer {
 
         match (flex_direction, flex_wrap) {
             (FlexDirection::Row | FlexDirection::RowReverse, FlexWrap::Nowrap) => {
-                child_iter.fold(base, |mut acc, child_content_sizes| {
+                let child_contributions = child_iter.fold(base, |mut acc, child_content_sizes| {
                     acc.min_content = acc.min_content + child_content_sizes.min_content;
                     acc.max_content = acc.max_content + child_content_sizes.max_content;
                     acc
-                })
+                });
+
+                ContentSizes {
+                    min_content: child_contributions.min_content + column_gap_contribution,
+                    max_content: child_contributions.max_content + column_gap_contribution,
+                }
             },
             (
                 FlexDirection::Row | FlexDirection::RowReverse,
                 FlexWrap::Wrap | FlexWrap::WrapReverse,
-            ) => child_iter.fold(base, |mut acc, child_content_sizes| {
-                acc.min_content = acc.min_content.max(child_content_sizes.min_content);
-                acc.max_content = acc.max_content + child_content_sizes.max_content;
-                acc
-            }),
+            ) => {
+                let child_contributions = child_iter.fold(base, |mut acc, child_content_sizes| {
+                    acc.min_content = acc.min_content.max(child_content_sizes.min_content);
+                    acc.max_content = acc.max_content + child_content_sizes.max_content;
+                    acc
+                });
+
+                ContentSizes {
+                    min_content: child_contributions.min_content,
+                    max_content: child_contributions.max_content + column_gap_contribution,
+                }
+            },
             (FlexDirection::Column | FlexDirection::ColumnReverse, _) => {
                 child_iter.fold(base, |mut acc, child_content_sizes| {
                     acc.min_content = acc.min_content.max(child_content_sizes.min_content);
