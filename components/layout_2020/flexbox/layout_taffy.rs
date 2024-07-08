@@ -136,12 +136,18 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
                         // The containing block of a flex item is the content box of the flex container
                         let containing_block = &self.content_box_size_override;
 
-                        replaced.contents.used_size_as_if_inline_element(
+                        let content_box_size = replaced.contents.used_size_as_if_inline_element(
                             &containing_block,
                             &replaced.style,
                             None, //box_size,
                             &replaced.style.padding_border_margin(&containing_block),
-                        )
+                        );
+
+                        child.child_fragments = replaced
+                            .contents
+                            .make_fragments(&replaced.style, content_box_size);
+
+                        content_box_size
                     },
 
                     // TODO: better handling of flexbox items (which can't precompute inline sizes)
