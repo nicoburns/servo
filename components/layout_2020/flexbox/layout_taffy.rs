@@ -145,15 +145,19 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
 
                         // Adjust known_dimensions from border box to content box
                         let pbm = replaced.style.padding_border_margin(&containing_block);
-                        let content_box_known_dimensions =
-                            taffy::Size {
-                                width: inputs.known_dimensions.width.map(|width| {
-                                    width - pbm.padding_border_sums.inline.to_f32_px()
-                                }),
-                                height: inputs.known_dimensions.height.map(|height| {
-                                    height - pbm.padding_border_sums.block.to_f32_px()
-                                }),
-                            };
+                        let margin_sum = pbm.margin.auto_is(Au::zero).sum();
+                        let content_box_inset =
+                            (pbm.padding_border_sums + margin_sum).map(|v| v.to_f32_px());
+                        let content_box_known_dimensions = taffy::Size {
+                            width: inputs
+                                .known_dimensions
+                                .width
+                                .map(|width| width - content_box_inset.inline),
+                            height: inputs
+                                .known_dimensions
+                                .height
+                                .map(|height| height - content_box_inset.block),
+                        };
 
                         let content_box_size_override = LogicalVec2 {
                             inline: option_f32_to_lpa(content_box_known_dimensions.width),
@@ -173,11 +177,12 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
 
                         taffy::Size {
                             width: inputs.known_dimensions.width.unwrap_or_else(|| {
-                                (content_box_size.inline + pbm.padding_border_sums.inline)
-                                    .to_f32_px()
+                                content_box_size.inline.to_f32_px() +
+                                    pbm.padding_border_sums.inline.to_f32_px()
                             }),
                             height: inputs.known_dimensions.height.unwrap_or_else(|| {
-                                (content_box_size.block + pbm.padding_border_sums.block).to_f32_px()
+                                content_box_size.block.to_f32_px() +
+                                    pbm.padding_border_sums.block.to_f32_px()
                             }),
                         }
                     },
@@ -189,21 +194,30 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
 
                         // Adjust known_dimensions from border box to content box
                         let pbm = non_replaced.style.padding_border_margin(containing_block);
-                        let content_box_known_dimensions =
-                            taffy::Size {
-                                width: inputs.known_dimensions.width.map(|width| {
-                                    width - pbm.padding_border_sums.inline.to_f32_px()
-                                }),
-                                height: inputs.known_dimensions.height.map(|height| {
-                                    height - pbm.padding_border_sums.block.to_f32_px()
-                                }),
-                            };
+                        let margin_sum = pbm.margin.auto_is(Au::zero).sum();
+                        let content_box_inset =
+                            (pbm.padding_border_sums + margin_sum).map(|v| v.to_f32_px());
+                        let content_box_known_dimensions = taffy::Size {
+                            width: inputs
+                                .known_dimensions
+                                .width
+                                .map(|width| width - content_box_inset.inline),
+                            height: inputs
+                                .known_dimensions
+                                .height
+                                .map(|height| height - content_box_inset.block),
+                        };
 
                         // Compute inline size
                         let inline_size = content_box_known_dimensions.width.unwrap_or_else(|| {
                             let inline_sizes =
                                 non_replaced.inline_content_sizes(&self.layout_context);
-                            resolve_content_size(inputs.available_space.width, inline_sizes)
+                            let adjusted_available_space = inputs
+                                .available_space
+                                .width
+                                .map_definite_value(|width| width - content_box_inset.inline);
+
+                            resolve_content_size(adjusted_available_space, inline_sizes)
                         });
 
                         let maybe_block_size =
