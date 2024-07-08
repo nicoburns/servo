@@ -458,11 +458,29 @@ impl ReplacedContent {
         )
         .map(|v| v.auto_is(Au::zero));
 
-        let known_dimensions = box_size;
+        let clamp = |inline_size: Au, block_size: Au| LogicalVec2 {
+            inline: inline_size.clamp_between_extremums(min_box_size.inline, max_box_size.inline),
+            block: block_size.clamp_between_extremums(min_box_size.block, max_box_size.block),
+        };
+
+        let known_dimensions = maybe_apply_aspect_ratio(
+            box_size.unwrap_or(LogicalVec2 {
+                inline: AuOrAuto::Auto,
+                block: AuOrAuto::Auto,
+            }),
+            aspect_ratio,
+        );
+
+        if !known_dimensions.inline.is_auto() && !known_dimensions.block.is_auto() {
+            return known_dimensions.map(|val| val.non_auto().unwrap());
+        }
 
         // Fallback to style size + apply aspect ratio
-        let box_size =
-            maybe_apply_aspect_ratio(box_size.unwrap_or(preferred_box_size), aspect_ratio);
+        let box_size = maybe_apply_aspect_ratio(preferred_box_size, aspect_ratio);
+
+        if !box_size.inline.is_auto() && !box_size.block.is_auto() {
+            return box_size.map(|val| val.non_auto().unwrap());
+        }
 
         // Fallback to style size componentwise + apply aspect ratio
         let box_size = maybe_apply_aspect_ratio(
@@ -472,6 +490,10 @@ impl ReplacedContent {
             },
             aspect_ratio,
         );
+
+        if !box_size.inline.is_auto() && !box_size.block.is_auto() {
+            return box_size.map(|val| val.non_auto().unwrap());
+        }
 
         let apply_violations =
             box_size.inline.is_auto() && box_size.block.is_auto() && aspect_ratio.is_some();
@@ -497,11 +519,6 @@ impl ReplacedContent {
 
         dbg!(apply_violations);
         dbg!(box_size);
-
-        let clamp = |inline_size: Au, block_size: Au| LogicalVec2 {
-            inline: inline_size.clamp_between_extremums(min_box_size.inline, max_box_size.inline),
-            block: block_size.clamp_between_extremums(min_box_size.block, max_box_size.block),
-        };
 
         // Fallback to intrinsic size + apply aspect ratio
         // Clamp by min and max size
