@@ -4,6 +4,7 @@
 
 use app_units::Au;
 use atomic_refcell::{AtomicRefCell, AtomicRefMut};
+use style::logical_geometry::WritingMode;
 use style::properties::longhands::flex_direction::computed_value::T as FlexDirection;
 use style::properties::longhands::flex_wrap::computed_value::T as FlexWrap;
 use style::properties::ComputedValues;
@@ -335,9 +336,9 @@ impl FlexContainer {
         let child_iter = self.children.iter().filter_map(|child| {
             let mut child = (**child).borrow_mut();
             match &mut child.flex_level_box {
-                FlexLevelBoxInner::FlexItem(item) => {
-                    Some(item.inline_content_sizes(layout_context))
-                },
+                FlexLevelBoxInner::FlexItem(item) => Some(
+                    item.outer_inline_content_sizes(layout_context, WritingMode::horizontal_tb()),
+                ),
                 FlexLevelBoxInner::OutOfFlowAbsolutelyPositionedBox(_) => None,
             }
         });
