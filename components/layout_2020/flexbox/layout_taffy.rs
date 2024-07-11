@@ -12,6 +12,7 @@ use style::values::computed::CSSPixelLength;
 use style::values::generics::length::{
     GenericLengthPercentageOrAuto, GenericLengthPercentageOrNormal, LengthPercentageOrAuto,
 };
+use style::values::specified::box_::DisplayInside;
 use style::Zero;
 use taffy::MaybeMath;
 use taffy_stylo::{TaffyStyloStyle, TaffyStyloStyleRef};
@@ -301,6 +302,31 @@ impl taffy::LayoutFlexboxContainer for FlexContext<'_> {
     }
 }
 
+impl taffy::LayoutGridContainer for FlexContext<'_> {
+    type ContainerStyle<'a> = TaffyStyloStyleRef<'a>
+    where
+        Self: 'a;
+
+    type ItemStyle<'a> = TaffyStyloStyle
+    where
+        Self: 'a;
+
+    fn get_grid_container_style(
+        &self,
+        _node_id: taffy::prelude::NodeId,
+    ) -> Self::ContainerStyle<'_> {
+        TaffyStyloStyleRef(self.style)
+    }
+
+    // TODO: Make a RefCell variant of TaffyStyloStyle to avoid the Arc clone here
+    fn get_grid_child_style(&self, child_node_id: taffy::prelude::NodeId) -> Self::ItemStyle<'_> {
+        let id = usize::from(child_node_id);
+        let child = (*self.source_child_nodes[id]).borrow();
+        let style = child.style.clone();
+        TaffyStyloStyle(style)
+    }
+}
+
 impl FlexContainer {
     pub fn inline_content_sizes(
         &self,
@@ -434,20 +460,25 @@ impl FlexContainer {
             height: auto_or_to_option(containing_block.block_size).map(Au::to_f32_px),
         };
 
-        let output = taffy::compute_flexbox_layout(
-            &mut flex_context,
-            taffy::NodeId::from(usize::MAX),
-            taffy::LayoutInput {
-                run_mode: taffy::RunMode::PerformLayout,
-                sizing_mode: taffy::SizingMode::InherentSize,
-                axis: taffy::RequestedAxis::Vertical,
-                vertical_margins_are_collapsible: taffy::Line::FALSE,
+        const DUMMY_NODE_ID: taffy::NodeId = taffy::NodeId::new(u64::MAX);
 
-                known_dimensions,
-                parent_size: taffy_containing_block,
-                available_space: taffy_containing_block.map(taffy::AvailableSpace::from),
+        let layout_input = taffy::LayoutInput {
+            run_mode: taffy::RunMode::PerformLayout,
+            sizing_mode: taffy::SizingMode::InherentSize,
+            axis: taffy::RequestedAxis::Vertical,
+            vertical_margins_are_collapsible: taffy::Line::FALSE,
+
+            known_dimensions,
+            parent_size: taffy_containing_block,
+            available_space: taffy_containing_block.map(taffy::AvailableSpace::from),
+        };
+
+        let output = match flex_context.style.clone_display().inside() {
+            DisplayInside::Grid => {
+                taffy::compute_grid_layout(&mut flex_context, DUMMY_NODE_ID, layout_input)
             },
-        );
+            _ => taffy::compute_flexbox_layout(&mut flex_context, DUMMY_NODE_ID, layout_input),
+        };
 
         // Convert `taffy::Layout` into Servo `Fragment`s
         let fragments: Vec<Fragment> = self
