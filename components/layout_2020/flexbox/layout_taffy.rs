@@ -14,6 +14,7 @@ use style::values::generics::length::{
 };
 use style::values::specified::box_::DisplayInside;
 use style::Zero;
+use taffy::style_helpers::{TaffyMaxContent, TaffyMinContent};
 use taffy::MaybeMath;
 use taffy_stylo::{TaffyStyloStyle, TaffyStyloStyleRef};
 
@@ -32,6 +33,8 @@ use crate::ContainingBlock;
 // even if `position` is `static` (behaving exactly as if `position` were `relative`).”
 // https://drafts.csswg.org/css-flexbox/#painting
 // (likely in `display_list/stacking_context.rs`)
+
+const DUMMY_NODE_ID: taffy::NodeId = taffy::NodeId::new(u64::MAX);
 
 fn resolve_content_size(constraint: taffy::AvailableSpace, content_sizes: ContentSizes) -> f32 {
     match constraint {
@@ -333,87 +336,149 @@ impl FlexContainer {
         layout_context: &LayoutContext,
         style: &ComputedValues,
     ) -> ContentSizes {
-        let flex_direction = style.get_position().flex_direction;
-        let flex_wrap = style.get_position().flex_wrap;
-        let column_gap = match style.clone_column_gap() {
-            GenericLengthPercentageOrNormal::Normal => 0.0,
-            GenericLengthPercentageOrNormal::LengthPercentage(lp) => {
-                lp.0.resolve(CSSPixelLength::new(0.0)).px()
-            },
-        };
+        match style.clone_display().inside() {
+            DisplayInside::Grid => {
+                let max_content_inputs = taffy::LayoutInput {
+                    run_mode: taffy::RunMode::ComputeSize,
+                    sizing_mode: taffy::SizingMode::InherentSize,
+                    axis: taffy::RequestedAxis::Horizontal,
+                    vertical_margins_are_collapsible: taffy::Line::FALSE,
 
-        // TODO: account for display:contents
-        let in_flow_child_count: usize = self
-            .children
-            .iter()
-            .filter(|child| {
-                let child = (**child).borrow();
-                match &child.flex_level_box {
-                    FlexLevelBoxInner::FlexItem(item) => !item.style().clone_display().is_none(),
-                    FlexLevelBoxInner::OutOfFlowAbsolutelyPositionedBox(_) => false,
-                }
-            })
-            .count();
+                    known_dimensions: taffy::Size::NONE,
+                    parent_size: taffy::Size::NONE,
+                    available_space: taffy::Size::MAX_CONTENT,
+                };
 
-        let column_gap_contribution = if in_flow_child_count == 0 {
-            Au::zero()
-        } else {
-            Au::from_f32_px(column_gap * (in_flow_child_count - 1) as f32)
-        };
+                let min_content_inputs = taffy::LayoutInput {
+                    available_space: taffy::Size::MIN_CONTENT,
+                    ..max_content_inputs
+                };
 
-        let base = ContentSizes {
-            min_content: Au::zero(),
-            max_content: Au::zero(),
-        };
+                let containing_block = &ContainingBlock {
+                    inline_size: Au::zero(),
+                    block_size: GenericLengthPercentageOrAuto::Auto,
+                    style: &style,
+                };
 
-        if in_flow_child_count == 0 {
-            return base;
-        }
+                let mut grid_context = FlexContext {
+                    layout_context,
+                    positioning_context:
+                        &mut PositioningContext::new_for_containing_block_for_all_descendants(),
+                    content_box_size_override: &containing_block,
+                    style: &style,
+                    source_child_nodes: &self.children,
+                };
 
-        let child_iter = self.children.iter().filter_map(|child| {
-            let mut child = (**child).borrow_mut();
-            match &mut child.flex_level_box {
-                FlexLevelBoxInner::FlexItem(item) => Some(
-                    item.outer_inline_content_sizes(layout_context, WritingMode::horizontal_tb()),
-                ),
-                FlexLevelBoxInner::OutOfFlowAbsolutelyPositionedBox(_) => None,
-            }
-        });
+                let max_content_output = taffy::compute_grid_layout(
+                    &mut grid_context,
+                    DUMMY_NODE_ID,
+                    max_content_inputs,
+                );
+                let min_content_output = taffy::compute_grid_layout(
+                    &mut grid_context,
+                    DUMMY_NODE_ID,
+                    min_content_inputs,
+                );
 
-        match (flex_direction, flex_wrap) {
-            (FlexDirection::Row | FlexDirection::RowReverse, FlexWrap::Nowrap) => {
-                let child_contributions = child_iter.fold(base, |mut acc, child_content_sizes| {
-                    acc.min_content = acc.min_content + child_content_sizes.min_content;
-                    acc.max_content = acc.max_content + child_content_sizes.max_content;
-                    acc
-                });
+                let pb_sums = style
+                    .padding_border_margin(containing_block)
+                    .padding_border_sums;
 
                 ContentSizes {
-                    min_content: child_contributions.min_content + column_gap_contribution,
-                    max_content: child_contributions.max_content + column_gap_contribution,
+                    max_content: Au::from_f32_px(max_content_output.size.width) - pb_sums.inline,
+                    min_content: Au::from_f32_px(min_content_output.size.width) - pb_sums.inline,
                 }
             },
-            (
-                FlexDirection::Row | FlexDirection::RowReverse,
-                FlexWrap::Wrap | FlexWrap::WrapReverse,
-            ) => {
-                let child_contributions = child_iter.fold(base, |mut acc, child_content_sizes| {
-                    acc.min_content = acc.min_content.max(child_content_sizes.min_content);
-                    acc.max_content = acc.max_content + child_content_sizes.max_content;
-                    acc
+            _ => {
+                let flex_direction = style.get_position().flex_direction;
+                let flex_wrap = style.get_position().flex_wrap;
+                let column_gap = match style.clone_column_gap() {
+                    GenericLengthPercentageOrNormal::Normal => 0.0,
+                    GenericLengthPercentageOrNormal::LengthPercentage(lp) => {
+                        lp.0.resolve(CSSPixelLength::new(0.0)).px()
+                    },
+                };
+
+                // TODO: account for display:contents
+                let in_flow_child_count: usize = self
+                    .children
+                    .iter()
+                    .filter(|child| {
+                        let child = (**child).borrow();
+                        match &child.flex_level_box {
+                            FlexLevelBoxInner::FlexItem(item) => {
+                                !item.style().clone_display().is_none()
+                            },
+                            FlexLevelBoxInner::OutOfFlowAbsolutelyPositionedBox(_) => false,
+                        }
+                    })
+                    .count();
+
+                let column_gap_contribution = if in_flow_child_count == 0 {
+                    Au::zero()
+                } else {
+                    Au::from_f32_px(column_gap * (in_flow_child_count - 1) as f32)
+                };
+
+                let base = ContentSizes {
+                    min_content: Au::zero(),
+                    max_content: Au::zero(),
+                };
+
+                if in_flow_child_count == 0 {
+                    return base;
+                }
+
+                let child_iter = self.children.iter().filter_map(|child| {
+                    let mut child = (**child).borrow_mut();
+                    match &mut child.flex_level_box {
+                        FlexLevelBoxInner::FlexItem(item) => Some(item.outer_inline_content_sizes(
+                            layout_context,
+                            WritingMode::horizontal_tb(),
+                        )),
+                        FlexLevelBoxInner::OutOfFlowAbsolutelyPositionedBox(_) => None,
+                    }
                 });
 
-                ContentSizes {
-                    min_content: child_contributions.min_content,
-                    max_content: child_contributions.max_content + column_gap_contribution,
+                match (flex_direction, flex_wrap) {
+                    (FlexDirection::Row | FlexDirection::RowReverse, FlexWrap::Nowrap) => {
+                        let child_contributions =
+                            child_iter.fold(base, |mut acc, child_content_sizes| {
+                                acc.min_content = acc.min_content + child_content_sizes.min_content;
+                                acc.max_content = acc.max_content + child_content_sizes.max_content;
+                                acc
+                            });
+
+                        ContentSizes {
+                            min_content: child_contributions.min_content + column_gap_contribution,
+                            max_content: child_contributions.max_content + column_gap_contribution,
+                        }
+                    },
+                    (
+                        FlexDirection::Row | FlexDirection::RowReverse,
+                        FlexWrap::Wrap | FlexWrap::WrapReverse,
+                    ) => {
+                        let child_contributions =
+                            child_iter.fold(base, |mut acc, child_content_sizes| {
+                                acc.min_content =
+                                    acc.min_content.max(child_content_sizes.min_content);
+                                acc.max_content = acc.max_content + child_content_sizes.max_content;
+                                acc
+                            });
+
+                        ContentSizes {
+                            min_content: child_contributions.min_content,
+                            max_content: child_contributions.max_content + column_gap_contribution,
+                        }
+                    },
+                    (FlexDirection::Column | FlexDirection::ColumnReverse, _) => {
+                        child_iter.fold(base, |mut acc, child_content_sizes| {
+                            acc.min_content = acc.min_content.max(child_content_sizes.min_content);
+                            acc.max_content = acc.max_content.max(child_content_sizes.max_content);
+                            acc
+                        })
+                    },
                 }
-            },
-            (FlexDirection::Column | FlexDirection::ColumnReverse, _) => {
-                child_iter.fold(base, |mut acc, child_content_sizes| {
-                    acc.min_content = acc.min_content.max(child_content_sizes.min_content);
-                    acc.max_content = acc.max_content.max(child_content_sizes.max_content);
-                    acc
-                })
             },
         }
     }
@@ -459,8 +524,6 @@ impl FlexContainer {
             width: Some(containing_block.inline_size.to_f32_px()),
             height: auto_or_to_option(containing_block.block_size).map(Au::to_f32_px),
         };
-
-        const DUMMY_NODE_ID: taffy::NodeId = taffy::NodeId::new(u64::MAX);
 
         let layout_input = taffy::LayoutInput {
             run_mode: taffy::RunMode::PerformLayout,
