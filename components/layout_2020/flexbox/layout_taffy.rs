@@ -149,7 +149,12 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
                 let computed_size = match independent_context {
                     IndependentFormattingContext::Replaced(replaced) => {
                         // The containing block of a flex item is the content box of the flex container
-                        let containing_block = &self.content_box_size_override;
+                        let containing_block = ContainingBlock {
+                            // TODO: allow undefiend
+                            inline_size: Au::from_f32_px(inputs.parent_size.width.unwrap_or(0.0)),
+                            block_size: option_f32_to_lpa(inputs.parent_size.height),
+                            style: self.content_box_size_override.style,
+                        };
 
                         // Adjust known_dimensions from border box to content box
                         let pbm = replaced.style.padding_border_margin(&containing_block);
