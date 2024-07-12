@@ -146,7 +146,7 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
         with_independant_formatting_context(
             &mut child.flex_level_box,
             |independent_context| -> taffy::LayoutOutput {
-                let computed_size = match independent_context {
+                match independent_context {
                     IndependentFormattingContext::Replaced(replaced) => {
                         // The containing block of a flex item is the content box of the flex container
                         let containing_block = &self.content_box_size_override;
@@ -181,7 +181,7 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
                             .contents
                             .make_fragments(&replaced.style, content_box_size);
 
-                        taffy::Size {
+                        let computed_size = taffy::Size {
                             width: inputs.known_dimensions.width.unwrap_or_else(|| {
                                 content_box_size.inline.to_f32_px() +
                                     pbm.padding_border_sums.inline.to_f32_px()
@@ -190,6 +190,12 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
                                 content_box_size.block.to_f32_px() +
                                     pbm.padding_border_sums.block.to_f32_px()
                             }),
+                        };
+                        let size = inputs.known_dimensions.unwrap_or(computed_size);
+                        taffy::LayoutOutput {
+                            size,
+                            content_size: size,
+                            ..taffy::LayoutOutput::DEFAULT
                         }
                     },
 
@@ -256,19 +262,22 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
 
                         let block_size = layout.content_block_size.to_f32_px();
 
-                        taffy::Size {
+                        let computed_size = taffy::Size {
                             width: inline_size + pbm.padding_border_sums.inline.to_f32_px(),
                             height: block_size + pbm.padding_border_sums.block.to_f32_px(),
+                        };
+                        let size = inputs.known_dimensions.unwrap_or(computed_size);
+
+                        taffy::LayoutOutput {
+                            size,
+                            content_size: size,
+                            first_baselines: taffy::Point {
+                                x: None,
+                                y: layout.baselines.first.map(|au| au.to_f32_px()),
+                            },
+                            ..taffy::LayoutOutput::DEFAULT
                         }
                     },
-                };
-
-                let size = inputs.known_dimensions.unwrap_or(computed_size);
-
-                taffy::LayoutOutput {
-                    size,
-                    content_size: size,
-                    ..taffy::LayoutOutput::DEFAULT
                 }
             },
         )
@@ -620,18 +629,24 @@ impl FlexContainer {
                         // );
                         // positioning_context.append(child_positioning_context);
 
-                        Fragment::Box(BoxFragment::new(
-                            independent_box.base_fragment_info(),
-                            independent_box.style().clone(),
-                            // TODO: Eliminate clone
-                            child.child_fragments.clone(),
-                            content_size,
-                            padding,
-                            border,
-                            margin,
-                            None, /* clearance */
-                            collapsed_margin,
-                        ))
+                        Fragment::Box(
+                            BoxFragment::new(
+                                independent_box.base_fragment_info(),
+                                independent_box.style().clone(),
+                                // TODO: Eliminate clone
+                                child.child_fragments.clone(),
+                                content_size,
+                                padding,
+                                border,
+                                margin,
+                                None, /* clearance */
+                                collapsed_margin,
+                            )
+                            .with_baselines(Baselines {
+                                first: output.first_baselines.y.map(Au::from_f32_px),
+                                last: None,
+                            }),
+                        )
                     },
                     FlexLevelBoxInner::OutOfFlowAbsolutelyPositionedBox(abs_pos_box) => {
                         let hoisted_box = AbsolutelyPositionedBox::to_hoisted(
