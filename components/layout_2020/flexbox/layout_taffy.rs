@@ -287,18 +287,18 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
 }
 
 impl taffy::LayoutFlexboxContainer for FlexContext<'_> {
-    type ContainerStyle<'a> = TaffyStyloStyleRef<'a>
+    type FlexboxContainerStyle<'a> = TaffyStyloStyleRef<'a>
     where
         Self: 'a;
 
-    type ItemStyle<'a> = TaffyStyloStyle
+    type FlexboxItemStyle<'a> = TaffyStyloStyle
     where
         Self: 'a;
 
     fn get_flexbox_container_style(
         &self,
         _node_id: taffy::prelude::NodeId,
-    ) -> Self::ContainerStyle<'_> {
+    ) -> Self::FlexboxContainerStyle<'_> {
         TaffyStyloStyleRef(self.style)
     }
 
@@ -306,7 +306,7 @@ impl taffy::LayoutFlexboxContainer for FlexContext<'_> {
     fn get_flexbox_child_style(
         &self,
         child_node_id: taffy::prelude::NodeId,
-    ) -> Self::ItemStyle<'_> {
+    ) -> Self::FlexboxItemStyle<'_> {
         let id = usize::from(child_node_id);
         let child = (*self.source_child_nodes[id]).borrow();
         let style = child.style.clone();
@@ -315,23 +315,26 @@ impl taffy::LayoutFlexboxContainer for FlexContext<'_> {
 }
 
 impl taffy::LayoutGridContainer for FlexContext<'_> {
-    type ContainerStyle<'a> = TaffyStyloStyleRef<'a>
+    type GridContainerStyle<'a> = TaffyStyloStyleRef<'a>
     where
         Self: 'a;
 
-    type ItemStyle<'a> = TaffyStyloStyle
+    type GridItemStyle<'a> = TaffyStyloStyle
     where
         Self: 'a;
 
     fn get_grid_container_style(
         &self,
         _node_id: taffy::prelude::NodeId,
-    ) -> Self::ContainerStyle<'_> {
+    ) -> Self::GridContainerStyle<'_> {
         TaffyStyloStyleRef(self.style)
     }
 
     // TODO: Make a RefCell variant of TaffyStyloStyle to avoid the Arc clone here
-    fn get_grid_child_style(&self, child_node_id: taffy::prelude::NodeId) -> Self::ItemStyle<'_> {
+    fn get_grid_child_style(
+        &self,
+        child_node_id: taffy::prelude::NodeId,
+    ) -> Self::GridItemStyle<'_> {
         let id = usize::from(child_node_id);
         let child = (*self.source_child_nodes[id]).borrow();
         let style = child.style.clone();
