@@ -2425,6 +2425,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "grid"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be136d9dacc2a13cc70bb6c8f902b414fb2641f8db1314637c6b7933411a8f82"
+
+[[package]]
 name = "gstreamer"
 version = "0.22.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3756,6 +3762,8 @@ dependencies = [
  "servo_url",
  "style",
  "style_traits",
+ "taffy",
+ "taffy_stylo",
  "unicode-script",
  "unicode-segmentation",
  "url",
@@ -6710,6 +6718,28 @@ dependencies = [
  "pkg-config",
  "toml 0.8.9",
  "version-compare",
+]
+
+[[package]]
+name = "taffy"
+version = "0.5.2"
+source = "git+https://github.com/nicoburns/taffy?rev=c5d12b8770cb20bc39920eac2eac4f21bec1068b#c5d12b8770cb20bc39920eac2eac4f21bec1068b"
+dependencies = [
+ "arrayvec",
+ "grid",
+ "num-traits",
+ "serde",
+ "slotmap",
+]
+
+[[package]]
+name = "taffy_stylo"
+version = "0.0.1"
+source = "git+https://github.com/nicoburns/taffy?rev=c5d12b8770cb20bc39920eac2eac4f21bec1068b#c5d12b8770cb20bc39920eac2eac4f21bec1068b"
+dependencies = [
+ "servo_arc",
+ "style",
+ "taffy",
 ]
 
 [[package]]
