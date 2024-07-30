@@ -11,7 +11,7 @@ use style::properties::ComputedValues;
 use crate::cell::ArcRefCell;
 use crate::formatting_contexts::IndependentFormattingContext;
 use crate::fragment_tree::Fragment;
-use crate::positioned::AbsolutelyPositionedBox;
+use crate::positioned::{AbsolutelyPositionedBox, PositioningContext};
 
 mod construct;
 mod layout;
@@ -26,6 +26,8 @@ pub(crate) struct TaffyItemBox {
     pub(crate) taffy_layout_cache: taffy::Cache,
     pub(crate) taffy_layout: taffy::Layout,
     pub(crate) child_fragments: Vec<Fragment>,
+    #[serde(skip_serializing)]
+    pub(crate) positioning_context: PositioningContext,
     #[serde(skip_serializing)]
     pub(crate) style: Arc<ComputedValues>,
     pub(crate) taffy_level_box: TaffyItemBoxInner,
@@ -62,6 +64,7 @@ impl TaffyItemBox {
             taffy_layout_cache: Default::default(),
             taffy_layout: Default::default(),
             child_fragments: Vec::new(),
+            positioning_context: PositioningContext::new_for_containing_block_for_all_descendants(),
             style,
             taffy_level_box: flex_level_box,
         }
