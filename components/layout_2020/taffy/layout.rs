@@ -18,7 +18,7 @@ use crate::context::LayoutContext;
 use crate::formatting_contexts::{Baselines, IndependentFormattingContext, IndependentLayout};
 use crate::fragment_tree::{BoxFragment, CollapsedBlockMargins, Fragment};
 use crate::geom::{LogicalRect, LogicalSides, LogicalVec2};
-use crate::positioned::{AbsolutelyPositionedBox, PositioningContext};
+use crate::positioned::{AbsolutelyPositionedBox, PositioningContext, PositioningContextLength};
 use crate::sizing::ContentSizes;
 use crate::style_ext::ComputedValuesExt;
 use crate::ContainingBlock;
@@ -245,13 +245,14 @@ impl taffy::LayoutPartialTree for FlexContext<'_> {
                                 &containing_block,
                             );
 
-                            self.positioning_context.append(child_positioning_context);
+                            // Store layout data on child for later access
+                            child.positioning_context = child_positioning_context;
+
+                            // self.positioning_context.append(child_positioning_context);
 
                             layout
-                            // },
                         };
 
-                        // TODO: make this work for replaced boxes
                         child.child_fragments = layout.fragments;
 
                         let block_size = layout.content_block_size.to_f32_px();
@@ -476,8 +477,8 @@ impl TaffyContainer {
         let fragments: Vec<Fragment> = self
             .children
             .iter()
-            .map(|child| (**child).borrow())
-            .map(|child| {
+            .map(|child| (**child).borrow_mut())
+            .map(|mut child| {
                 fn rect_to_logical_sides<T>(rect: taffy::Rect<T>) -> LogicalSides<T> {
                     LogicalSides {
                         inline_start: rect.left,
@@ -540,16 +541,9 @@ impl TaffyContainer {
                     .map(Au::from_f32_px),
                 );
 
-                match &child.taffy_level_box {
+                match &mut child.taffy_level_box {
                     TaffyItemBoxInner::InFlowBox(independent_box) => {
-                        // TODO: propagate absolute/fixed boxes from child positioning context
-                        // child_positioning_context.adjust_static_position_of_hoisted_fragments(
-                        //     &fragment,
-                        //     PositioningContextLength::zero(),
-                        // );
-                        // positioning_context.append(child_positioning_context);
-
-                        Fragment::Box(
+                        let fragment = Fragment::Box(
                             BoxFragment::new(
                                 independent_box.base_fragment_info(),
                                 independent_box.style().clone(),
@@ -566,7 +560,18 @@ impl TaffyContainer {
                                 first: output.first_baselines.y.map(Au::from_f32_px),
                                 last: None,
                             }),
-                        )
+                        );
+
+                        child
+                            .positioning_context
+                            .adjust_static_position_of_hoisted_fragments(
+                                &fragment,
+                                PositioningContextLength::zero(),
+                            );
+                        // TODO: Eliminate clone
+                        positioning_context.append(child.positioning_context.clone());
+
+                        fragment
                     },
                     TaffyItemBoxInner::OutOfFlowAbsolutelyPositionedBox(abs_pos_box) => {
                         let hoisted_box = AbsolutelyPositionedBox::to_hoisted(
