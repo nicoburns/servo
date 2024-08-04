@@ -547,8 +547,7 @@ impl TaffyContainer {
                             BoxFragment::new(
                                 independent_box.base_fragment_info(),
                                 independent_box.style().clone(),
-                                // TODO: Eliminate clone
-                                child.child_fragments.clone(),
+                                std::mem::take(&mut child.child_fragments),
                                 content_size,
                                 padding,
                                 border,
@@ -568,8 +567,11 @@ impl TaffyContainer {
                                 &fragment,
                                 PositioningContextLength::zero(),
                             );
-                        // TODO: Eliminate clone
-                        positioning_context.append(child.positioning_context.clone());
+                        let child_positioning_context = std::mem::replace(
+                            &mut child.positioning_context,
+                            PositioningContext::new_for_containing_block_for_all_descendants(),
+                        );
+                        positioning_context.append(child_positioning_context);
 
                         fragment
                     },
