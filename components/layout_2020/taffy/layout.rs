@@ -5,6 +5,8 @@
 use app_units::Au;
 use atomic_refcell::{AtomicRef, AtomicRefCell};
 use style::properties::ComputedValues;
+use style::values::computed::length_percentage::CalcLengthPercentage;
+use style::values::computed::CSSPixelLength;
 use style::values::generics::length::{GenericLengthPercentageOrAuto, LengthPercentageOrAuto};
 use style::values::specified::align::AlignFlags;
 use style::values::specified::box_::DisplayInside;
@@ -106,6 +108,14 @@ impl taffy::LayoutPartialTree for TaffyContainerContext<'_> {
     fn set_unrounded_layout(&mut self, node_id: taffy::NodeId, layout: &taffy::Layout) {
         let id = usize::from(node_id);
         (*self.source_child_nodes[id]).borrow_mut().taffy_layout = *layout;
+    }
+
+    fn resolve_calc_value(&self, val: u64, basis: f32) -> f32 {
+        let calc_ptr = val as usize as *const CalcLengthPercentage;
+        // SAFETY: Calc value is the pointer we pass into Taffy. And Taffy does not retain styles.
+        #[allow(unsafe_code)]
+        let calc = unsafe { &*calc_ptr };
+        calc.resolve(CSSPixelLength::new(basis)).px()
     }
 
     fn compute_child_layout(
