@@ -9,6 +9,7 @@ use std::sync::LazyLock;
 
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use style::selector_parser::PseudoElement;
+use unicode_bidi::Level;
 
 use crate::PropagatedBoxTreeData;
 use crate::context::LayoutContext;
@@ -152,7 +153,7 @@ impl<'a, 'dom> ModernContainerBuilder<'a, 'dom> {
                         self.context,
                         true,  /* has_first_formatted_line */
                         false, /* is_single_line_text_box */
-                        self.info.style.writing_mode.to_bidi_level(),
+                        self.info.style.writing_mode.to_bidi_level().into(),
                     )?;
 
                     let block_formatting_context = BlockFormattingContext::from_block_container(
