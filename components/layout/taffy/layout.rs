@@ -216,6 +216,7 @@ impl taffy::LayoutPartialTree for TaffyContainerContext<'_> {
                 };
 
                 child.positioning_context = PositioningContext::default();
+                child.child_fragments.clear();
                 let layout = independent_context.layout(
                     self.layout_context,
                     &mut child.positioning_context,
@@ -225,6 +226,8 @@ impl taffy::LayoutPartialTree for TaffyContainerContext<'_> {
                     &lazy_block_size,
                 );
 
+
+                dbg!(layout.fragments.len());
                 child.child_fragments = layout.fragments;
                 self.child_specific_layout_infos[usize::from(node_id)] =
                     layout.specific_layout_info;
@@ -417,7 +420,7 @@ impl TaffyContainer {
         let layout_input = taffy::LayoutInput {
             run_mode: taffy::RunMode::PerformLayout,
             sizing_mode: taffy::SizingMode::InherentSize,
-            axis: taffy::RequestedAxis::Vertical,
+            axis: taffy::RequestedAxis::Both,
             vertical_margins_are_collapsible: taffy::Line::FALSE,
 
             known_dimensions,
@@ -493,12 +496,15 @@ impl TaffyContainer {
                 let child_specific_layout_info: Option<SpecificLayoutInfo> =
                     std::mem::take(&mut container_ctx.child_specific_layout_infos[child_id]);
 
+                dbg!(child.child_fragments.len());
+
                 let fragment = match &mut child.taffy_level_box {
                     TaffyItemBoxInner::InFlowBox(independent_box) => {
                         let mut fragment_info = independent_box.base_fragment_info();
                         fragment_info
                             .flags
                             .insert(FragmentFlags::IS_FLEX_OR_GRID_ITEM);
+
                         let mut box_fragment = BoxFragment::new(
                             fragment_info,
                             independent_box.style().clone(),

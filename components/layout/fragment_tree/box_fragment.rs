@@ -16,6 +16,7 @@ use style::computed_values::overflow_x::T as ComputedOverflow;
 use style::computed_values::position::T as ComputedPosition;
 use style::logical_geometry::WritingMode;
 use style::properties::ComputedValues;
+use style_traits::ToCss;
 
 use super::{BaseFragment, BaseFragmentInfo, CollapsedBlockMargins, Fragment, FragmentFlags};
 use crate::SharedStyle;
@@ -296,6 +297,10 @@ impl BoxFragment {
         // overflow together, but from the specification it seems that if the border
         // box of an item is in the "wholly unreachable scrollable overflow region", but
         // its scrollable overflow is not, it should also be excluded.
+
+        dbg!(self.style().clone_display().to_css_string());
+        dbg!(self.children.len());
+
         let scrollable_overflow = self
             .children
             .iter()

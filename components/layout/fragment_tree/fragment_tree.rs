@@ -66,6 +66,7 @@ impl FragmentTree {
     }
 
     pub(crate) fn scrollable_overflow(&self) -> PhysicalRect<Au> {
+        self.print();
         self.scrollable_overflow
             .get()
             .expect("Should only call `scrollable_overflow()` after calculating overflow")
