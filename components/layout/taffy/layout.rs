@@ -312,6 +312,11 @@ impl ComputeInlineContentSizes for TaffyContainer {
             vertical_margins_are_collapsible: taffy::Line::FALSE,
 
             known_dimensions: taffy::Size::NONE,
+            // Ignored as there are no known dimensions.
+            known_dimensions_are_definite: taffy::Size {
+                width: true,
+                height: true,
+            },
             parent_size: taffy::Size::NONE,
             available_space: taffy::Size::MAX_CONTENT,
         };
@@ -425,6 +430,11 @@ impl TaffyContainer {
             vertical_margins_are_collapsible: taffy::Line::FALSE,
 
             known_dimensions,
+            // TODO: compute this properly
+            known_dimensions_are_definite: taffy::Size {
+                width: true,
+                height: true,
+            },
             parent_size: taffy_containing_block,
             available_space: taffy_containing_block.map(AvailableSpace::from),
         };
