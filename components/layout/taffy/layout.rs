@@ -510,6 +510,27 @@ impl TaffyContainer {
                     .map(Au::from_f32_px),
                 );
 
+                // The margin box of the child, relative to the container's content box. This is
+                // used as the static position rect of absolutely positioned children.
+                let margin_box_rect = PhysicalRect::new(
+                    PhysicalPoint::new(
+                        Au::from_f32_px(layout.location.x - layout.margin.left) -
+                            pbm.padding.inline_start -
+                            pbm.border.inline_start,
+                        Au::from_f32_px(layout.location.y - layout.margin.top) -
+                            pbm.padding.block_start -
+                            pbm.border.block_start,
+                    ),
+                    PhysicalSize::new(
+                        Au::from_f32_px(
+                            layout.size.width + layout.margin.left + layout.margin.right,
+                        ),
+                        Au::from_f32_px(
+                            layout.size.height + layout.margin.top + layout.margin.bottom,
+                        ),
+                    ),
+                );
+
                 let child_specific_layout_info: Option<SpecificLayoutInfo> =
                     std::mem::take(&mut container_ctx.child_specific_layout_infos[child_id]);
 
@@ -566,7 +587,7 @@ impl TaffyContainer {
 
                         let hoisted_box = AbsolutelyPositionedBox::to_hoisted(
                             abs_pos_box.clone(),
-                            content_size,
+                            margin_box_rect,
                             LogicalVec2 {
                                 inline: resolve_alignment(
                                     child.style.clone_align_self().0,
