@@ -21,7 +21,7 @@ use crate::context::LayoutContext;
 use crate::dom::{LayoutBox, WeakLayoutBox};
 use crate::dom_traversal::{NodeAndStyleInfo, NonReplacedContents};
 use crate::formatting_contexts::IndependentFormattingContext;
-use crate::fragment_tree::Fragment;
+use crate::fragment_tree::{Fragment, FragmentFlags};
 use crate::geom::{PhysicalPoint, PhysicalRect, PhysicalSides, PhysicalSize};
 use crate::layout_box_base::LayoutBoxBase;
 use crate::positioned::{AbsolutelyPositionedBox, PositioningContext};
@@ -31,6 +31,7 @@ use crate::{DefiniteContainingBlock, PropagatedBoxTreeData};
 pub(crate) struct TaffyContainer {
     children: Vec<ArcRefCell<TaffyItemBox>>,
     style: Arc<ComputedValues>,
+    fragment_flags: FragmentFlags,
 }
 
 impl TaffyContainer {
@@ -39,6 +40,7 @@ impl TaffyContainer {
         info: &NodeAndStyleInfo,
         contents: NonReplacedContents,
         propagated_data: PropagatedBoxTreeData,
+        fragment_flags: FragmentFlags,
     ) -> Self {
         let mut builder = ModernContainerBuilder::new(context, info, propagated_data);
         contents.traverse(context, info, &mut builder);
@@ -75,6 +77,7 @@ impl TaffyContainer {
         Self {
             children,
             style: info.style.clone(),
+            fragment_flags,
         }
     }
 
@@ -205,10 +208,11 @@ impl SpecificTaffyGridInfo {
     pub(crate) fn resolve_grid_area(
         &self,
         item_style: &ComputedValues,
+        item_fragment_flags: FragmentFlags,
         containing_block: &DefiniteContainingBlock,
         containing_block_border: PhysicalSides<Au>,
     ) -> PhysicalRect<Au> {
-        let item_style = TaffyStyloStyle::new(item_style, false);
+        let item_style = TaffyStyloStyle::new(item_style, false, item_fragment_flags);
         let writing_mode = containing_block.style.writing_mode;
         let physical_containing_block_size = containing_block.size.to_physical_size(writing_mode);
 

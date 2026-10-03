@@ -506,6 +506,7 @@ impl HoistedAbsolutelyPositionedBox {
         let grid_area = grid_info.map(|grid_info| {
             grid_info.resolve_grid_area(
                 independent_formatting_context.style(),
+                independent_formatting_context.base_fragment_info().flags,
                 containing_block,
                 containing_block_border,
             )
